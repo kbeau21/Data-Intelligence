@@ -10,13 +10,26 @@ from intelligence.models import Company, Connection, Report, SearchResult
 class Database:
     def __init__(self, db_path: str = "intelligence.db"):
         self.db_path = db_path
+        self._shared_conn = None
+        # For :memory: databases, keep a single persistent connection
+        if db_path == ":memory:":
+            self._shared_conn = sqlite3.connect(":memory:")
+            self._shared_conn.row_factory = sqlite3.Row
+            self._shared_conn.execute("PRAGMA foreign_keys = ON")
         self._init_schema()
 
     def _connect(self) -> sqlite3.Connection:
+        if self._shared_conn:
+            return self._shared_conn
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys = ON")
         return conn
+
+    def _close(self, conn: sqlite3.Connection):
+        """Close the connection unless it's the shared in-memory one."""
+        if conn is not self._shared_conn:
+            self._close(conn)
 
     def _init_schema(self):
         conn = self._connect()
@@ -70,7 +83,7 @@ class Database:
             CREATE INDEX IF NOT EXISTS idx_connections_batch ON connections(company_a_id, company_b_id);
         """)
         conn.commit()
-        conn.close()
+        self._close(conn)
 
     # -- Companies --
 
@@ -82,7 +95,7 @@ class Database:
         )
         company.id = cursor.lastrowid
         conn.commit()
-        conn.close()
+        self._close(conn)
         return company
 
     def get_companies_by_batch(self, batch_id: str) -> list[Company]:
@@ -90,13 +103,13 @@ class Database:
         rows = conn.execute(
             "SELECT * FROM companies WHERE upload_batch_id = ? ORDER BY name", (batch_id,)
         ).fetchall()
-        conn.close()
+        self._close(conn)
         return [self._row_to_company(r) for r in rows]
 
     def get_company(self, company_id: int) -> Company | None:
         conn = self._connect()
         row = conn.execute("SELECT * FROM companies WHERE id = ?", (company_id,)).fetchone()
-        conn.close()
+        self._close(conn)
         return self._row_to_company(row) if row else None
 
     def _row_to_company(self, row: sqlite3.Row) -> Company:
@@ -119,14 +132,14 @@ class Database:
             [(r.company_id, r.query, r.title, r.snippet, r.url, r.source, r.published_date) for r in results],
         )
         conn.commit()
-        conn.close()
+        self._close(conn)
 
     def get_search_results(self, company_id: int) -> list[SearchResult]:
         conn = self._connect()
         rows = conn.execute(
             "SELECT * FROM search_results WHERE company_id = ?", (company_id,)
         ).fetchall()
-        conn.close()
+        self._close(conn)
         return [
             SearchResult(
                 id=r["id"],
@@ -149,7 +162,7 @@ class Database:
                WHERE c.upload_batch_id = ?""",
             (batch_id,),
         ).fetchall()
-        conn.close()
+        self._close(conn)
         results: dict[int, list[SearchResult]] = {}
         for r in rows:
             sr = SearchResult(
@@ -179,13 +192,13 @@ class Database:
         )
         report.id = cursor.lastrowid
         conn.commit()
-        conn.close()
+        self._close(conn)
         return report
 
     def get_report(self, company_id: int) -> Report | None:
         conn = self._connect()
         row = conn.execute("SELECT * FROM reports WHERE company_id = ?", (company_id,)).fetchone()
-        conn.close()
+        self._close(conn)
         if not row:
             return None
         return Report(
@@ -213,7 +226,7 @@ class Database:
             ],
         )
         conn.commit()
-        conn.close()
+        self._close(conn)
 
     def get_connections_by_batch(self, batch_id: str, client_only: bool = True) -> list[dict]:
         """Get connections for a batch. If client_only=True, only return connections
@@ -232,7 +245,7 @@ class Database:
         query += " ORDER BY conn.strength DESC"
 
         rows = conn.execute(query, (batch_id,)).fetchall()
-        conn.close()
+        self._close(conn)
         return [
             {
                 "id": r["id"],
@@ -258,4 +271,4 @@ class Database:
             (batch_id,),
         )
         conn.commit()
-        conn.close()
+        self._close(conn)
