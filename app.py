@@ -17,6 +17,7 @@ from intelligence.search.serp_provider import SerpSearchProvider
 app = Flask(__name__)
 app.config["SECRET_KEY"] = config.SECRET_KEY
 app.config["MAX_CONTENT_LENGTH"] = config.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+os.makedirs(config.UPLOAD_FOLDER, exist_ok=True)
 
 db = Database(config.DATABASE_PATH)
 
