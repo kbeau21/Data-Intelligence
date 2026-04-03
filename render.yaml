@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: company-intelligence
+    runtime: docker
+    plan: free
+    envVars:
+      - key: SEARCH_PROVIDER
+        value: mock
+      - key: DATABASE_PATH
+        value: /tmp/intelligence.db
+      - key: SECRET_KEY
+        generateValue: true
