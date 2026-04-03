@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}{{ company.name }} - Intelligence Report{% endblock %}
+
+{% block content %}
+<div class="report-page">
+    <div class="report-nav">
+        <a href="/dashboard/{{ batch_id }}" class="btn btn-secondary">&larr; Back to Dashboard</a>
+    </div>
+
+    <div class="report-header">
+        <h1>{{ company.name }}</h1>
+        {% if company.is_client %}
+        <span class="badge badge-client">Client</span>
+        {% else %}
+        <span class="badge badge-prospect">Prospect</span>
+        {% endif %}
+        {% if company.address %}
+        <p class="report-address">{{ company.address }}</p>
+        {% endif %}
+    </div>
+
+    {% if report %}
+    <!-- Overview -->
+    <section class="report-section">
+        <h2>Overview</h2>
+        <p>{{ report.overview }}</p>
+    </section>
+
+    <!-- Relevance Analysis -->
+    <section class="report-section">
+        <h2>Why This Company Matters</h2>
+        <div class="relevance-content">
+            {% for line in report.relevance_analysis.split('\n') %}
+                {% if line.strip() %}
+                <p>{{ line }}</p>
+                {% endif %}
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- Outreach Suggestions -->
+    <section class="report-section">
+        <h2>Reasons to Reach Out</h2>
+        <div class="outreach-list">
+            {% for suggestion in report.outreach_suggestions %}
+            <div class="outreach-item">
+                <div class="outreach-number">{{ loop.index }}</div>
+                <p>{{ suggestion }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- Recent News -->
+    {% if report.recent_news %}
+    <section class="report-section">
+        <h2>Recent News & Activity</h2>
+        <div class="news-list">
+            {% for item in report.recent_news %}
+            <div class="news-item">
+                <div class="news-meta">
+                    <span class="news-source">{{ item.source }}</span>
+                    {% if item.date %}
+                    <span class="news-date">{{ item.date }}</span>
+                    {% endif %}
+                </div>
+                <h4><a href="{{ item.url }}" target="_blank" rel="noopener">{{ item.title }}</a></h4>
+                <p>{{ item.summary }}</p>
+                {% if item.categories %}
+                <div class="news-tags">
+                    {% for cat in item.categories %}
+                    <span class="tag">{{ cat | replace('_', ' ') | title }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+                {% if item.mentions_companies %}
+                <div class="news-mentions">
+                    Also mentions: {{ item.mentions_companies | join(', ') }}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    <!-- Connections -->
+    {% if connections %}
+    <section class="report-section">
+        <h2>Connections to Other Companies</h2>
+        <div class="connection-list">
+            {% for conn in connections %}
+            <div class="connection-item">
+                <div class="connection-companies">
+                    <span class="{% if conn.a_is_client %}client-name{% endif %}">{{ conn.company_a_name }}</span>
+                    <span class="connection-arrow">&harr;</span>
+                    <span class="{% if conn.b_is_client %}client-name{% endif %}">{{ conn.company_b_name }}</span>
+                </div>
+                <span class="connection-type badge">{{ conn.connection_type | replace('_', ' ') | title }}</span>
+                <p class="connection-desc">{{ conn.description }}</p>
+                <div class="strength-bar">
+                    <div class="strength-fill" style="width: {{ (conn.strength * 100)|int }}%"></div>
+                    <span class="strength-label">{{ (conn.strength * 100)|int }}% confidence</span>
+                </div>
+                {% if conn.evidence_urls %}
+                <div class="evidence">
+                    {% for url in conn.evidence_urls %}
+                    <a href="{{ url }}" target="_blank" rel="noopener" class="evidence-link">Source {{ loop.index }}</a>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+
+    {% else %}
+    <div class="alert alert-info">
+        Report not yet generated. Go back to the dashboard and click "Re-Analyze" to process this company.
+    </div>
+    {% endif %}
+
+    <!-- Raw Search Results -->
+    {% if search_results %}
+    <section class="report-section collapsible">
+        <h2 onclick="this.parentElement.classList.toggle('expanded')">
+            Raw Search Results ({{ search_results|length }})
+            <span class="toggle-icon">+</span>
+        </h2>
+        <div class="collapsible-content">
+            {% for result in search_results %}
+            <div class="search-result-item">
+                <h4><a href="{{ result.url }}" target="_blank" rel="noopener">{{ result.title }}</a></h4>
+                <p>{{ result.snippet }}</p>
+                <span class="search-source">{{ result.source }}</span>
+                {% if result.published_date %}
+                <span class="search-date">{{ result.published_date }}</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+</div>
+{% endblock %}

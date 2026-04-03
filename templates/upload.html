@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Companies - Company Intelligence{% endblock %}
+
+{% block content %}
+<div class="upload-page">
+    <div class="upload-hero">
+        <h1>Company Intelligence System</h1>
+        <p class="subtitle">Upload your company list and get actionable intelligence — connections, news, and reasons to reach out.</p>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+
+    <div class="upload-card">
+        <form action="/upload" method="POST" enctype="multipart/form-data" id="upload-form">
+            <div class="upload-zone" id="drop-zone">
+                <div class="upload-icon">&#128196;</div>
+                <h3>Drop your Excel file here</h3>
+                <p>or click to browse</p>
+                <input type="file" name="file" id="file-input" accept=".xlsx,.xls" />
+                <div id="file-name" class="file-name"></div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-lg" id="upload-btn" disabled>
+                Upload & Analyze
+            </button>
+        </form>
+    </div>
+
+    <div class="format-guide">
+        <h3>Expected Excel Format</h3>
+        <table class="guide-table">
+            <thead>
+                <tr>
+                    <th>Company Name</th>
+                    <th>Address</th>
+                    <th>Client</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Acme Corporation</td>
+                    <td>123 Main St, Springfield, IL</td>
+                    <td>Yes</td>
+                </tr>
+                <tr>
+                    <td>Beta Industries</td>
+                    <td>456 Oak Ave, Chicago, IL</td>
+                    <td>No</td>
+                </tr>
+                <tr>
+                    <td>Gamma Partners</td>
+                    <td>789 Pine Rd, Denver, CO</td>
+                    <td>Yes</td>
+                </tr>
+            </tbody>
+        </table>
+        <p class="guide-note">
+            <strong>Column names are flexible.</strong> We recognize variations like "Company", "Business Name",
+            "Is Client", "Client?", etc. The Client column accepts "Yes", "Y", "True", "1", or "X".
+        </p>
+    </div>
+</div>
+
+<script>
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+const fileName = document.getElementById('file-name');
+const uploadBtn = document.getElementById('upload-btn');
+
+dropZone.addEventListener('click', () => fileInput.click());
+
+dropZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropZone.classList.add('drag-over');
+});
+
+dropZone.addEventListener('dragleave', () => {
+    dropZone.classList.remove('drag-over');
+});
+
+dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    if (e.dataTransfer.files.length) {
+        fileInput.files = e.dataTransfer.files;
+        updateFileName();
+    }
+});
+
+fileInput.addEventListener('change', updateFileName);
+
+function updateFileName() {
+    if (fileInput.files.length) {
+        fileName.textContent = fileInput.files[0].name;
+        uploadBtn.disabled = false;
+    }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}Connections - Company Intelligence{% endblock %}
+
+{% block content %}
+<div class="connections-page">
+    <div class="report-nav">
+        <a href="/dashboard/{{ batch_id }}" class="btn btn-secondary">&larr; Back to Dashboard</a>
+    </div>
+
+    <div class="connections-header">
+        <h1>Company Connections</h1>
+        <p class="subtitle">
+            Showing {{ connections|length }} of {{ total_connections }} total connections.
+            {% if not show_all %}
+            Filtered to show only connections involving your clients.
+            {% endif %}
+        </p>
+        <div class="filter-toggle">
+            {% if show_all %}
+            <a href="/connections/{{ batch_id }}" class="btn btn-secondary active">Client Connections Only</a>
+            {% else %}
+            <a href="/connections/{{ batch_id }}?show_all=true" class="btn btn-secondary">Show All Connections</a>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if not show_all %}
+    <div class="alert alert-info">
+        Only showing connections where at least one company is marked as your client.
+        This helps you find warm introductions through your existing relationships.
+    </div>
+    {% endif %}
+
+    {% if connections %}
+    <div class="connection-list detailed">
+        {% for conn in connections %}
+        <div class="connection-item">
+            <div class="connection-companies">
+                <div class="company-tag {% if conn.a_is_client %}client{% endif %}">
+                    <a href="/report/{{ conn.company_a_id }}">{{ conn.company_a_name }}</a>
+                    {% if conn.a_is_client %}<span class="badge badge-client">Client</span>{% endif %}
+                </div>
+                <span class="connection-arrow">&harr;</span>
+                <div class="company-tag {% if conn.b_is_client %}client{% endif %}">
+                    <a href="/report/{{ conn.company_b_id }}">{{ conn.company_b_name }}</a>
+                    {% if conn.b_is_client %}<span class="badge badge-client">Client</span>{% endif %}
+                </div>
+            </div>
+
+            <div class="connection-details">
+                <span class="connection-type badge">{{ conn.connection_type | replace('_', ' ') | title }}</span>
+                <div class="strength-bar">
+                    <div class="strength-fill" style="width: {{ (conn.strength * 100)|int }}%"></div>
+                    <span class="strength-label">{{ (conn.strength * 100)|int }}% confidence</span>
+                </div>
+            </div>
+
+            <p class="connection-desc">{{ conn.description }}</p>
+
+            {% if conn.a_is_client and not conn.b_is_client %}
+            <div class="inroad-suggestion">
+                <strong>Potential Inroad:</strong> Since {{ conn.company_a_name }} is your client,
+                you can ask them for an introduction to {{ conn.company_b_name }}.
+                The connection type ({{ conn.connection_type | replace('_', ' ') }}) suggests
+                they likely have a working relationship.
+            </div>
+            {% elif conn.b_is_client and not conn.a_is_client %}
+            <div class="inroad-suggestion">
+                <strong>Potential Inroad:</strong> Since {{ conn.company_b_name }} is your client,
+                you can ask them for an introduction to {{ conn.company_a_name }}.
+                The connection type ({{ conn.connection_type | replace('_', ' ') }}) suggests
+                they likely have a working relationship.
+            </div>
+            {% elif conn.a_is_client and conn.b_is_client %}
+            <div class="inroad-suggestion">
+                <strong>Cross-Client Opportunity:</strong> Both {{ conn.company_a_name }} and
+                {{ conn.company_b_name }} are your clients. Their
+                {{ conn.connection_type | replace('_', ' ') }} connection might present
+                opportunities for joint solutions or cross-referrals.
+            </div>
+            {% endif %}
+
+            {% if conn.evidence_urls %}
+            <div class="evidence">
+                {% for url in conn.evidence_urls %}
+                <a href="{{ url }}" target="_blank" rel="noopener" class="evidence-link">Source {{ loop.index }}</a>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+        <h3>No connections found</h3>
+        <p>
+            {% if not show_all %}
+            No connections involving your clients were detected. Try viewing all connections to see if
+            there are any relationships between non-client companies.
+            {% else %}
+            No connections were detected between any of the uploaded companies.
+            {% endif %}
+        </p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

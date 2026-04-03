@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Company Intelligence{% endblock %}
+
+{% block content %}
+<div class="dashboard">
+    <!-- Processing overlay -->
+    <div id="processing-overlay" class="processing-overlay" {% if not autoprocess %}style="display:none"{% endif %}>
+        <div class="processing-card">
+            <h2>Analyzing Companies</h2>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+            <p id="progress-message">Starting analysis...</p>
+            <p class="progress-detail" id="progress-detail"></p>
+        </div>
+    </div>
+
+    <div class="dashboard-header">
+        <h1>Intelligence Dashboard</h1>
+        <div class="dashboard-stats">
+            <div class="stat">
+                <span class="stat-number">{{ company_reports|length }}</span>
+                <span class="stat-label">Companies</span>
+            </div>
+            <div class="stat">
+                <span class="stat-number">{{ company_reports|selectattr('company.is_client')|list|length }}</span>
+                <span class="stat-label">Clients</span>
+            </div>
+            <div class="stat">
+                <span class="stat-number">{{ client_connections }}</span>
+                <span class="stat-label">Client Connections</span>
+            </div>
+            <div class="stat">
+                <span class="stat-number">{{ total_connections }}</span>
+                <span class="stat-label">Total Connections</span>
+            </div>
+        </div>
+        <div class="dashboard-actions">
+            <a href="/connections/{{ batch_id }}" class="btn btn-secondary">View All Connections</a>
+            {% if not autoprocess %}
+            <a href="/api/process/{{ batch_id }}" class="btn btn-primary" id="reprocess-btn"
+               onclick="event.preventDefault(); startProcessing();">Re-Analyze</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Company Cards -->
+    <div class="company-grid" id="company-grid">
+        {% for cr in company_reports %}
+        <div class="company-card {% if cr.company.is_client %}client-card{% endif %}">
+            <div class="card-header">
+                <h3>
+                    <a href="/report/{{ cr.company.id }}">{{ cr.company.name }}</a>
+                </h3>
+                {% if cr.company.is_client %}
+                <span class="badge badge-client">Client</span>
+                {% else %}
+                <span class="badge badge-prospect">Prospect</span>
+                {% endif %}
+            </div>
+            {% if cr.company.address %}
+            <p class="card-address">{{ cr.company.address }}</p>
+            {% endif %}
+
+            {% if cr.report %}
+            <p class="card-overview">{{ cr.report.overview[:200] }}{% if cr.report.overview|length > 200 %}...{% endif %}</p>
+
+            {% if cr.report.outreach_suggestions %}
+            <div class="card-outreach">
+                <strong>Why reach out:</strong>
+                <p>{{ cr.report.outreach_suggestions[0][:150] }}{% if cr.report.outreach_suggestions[0]|length > 150 %}...{% endif %}</p>
+            </div>
+            {% endif %}
+
+            <div class="card-footer">
+                <a href="/report/{{ cr.company.id }}" class="btn btn-sm">View Full Report</a>
+            </div>
+            {% else %}
+            <p class="card-overview text-muted">Report not yet generated. Click "Re-Analyze" above.</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Client Connections Summary -->
+    {% if connections %}
+    <div class="connections-summary">
+        <h2>Key Connections <span class="subtitle">(involving your clients)</span></h2>
+        <div class="connection-list">
+            {% for conn in connections[:5] %}
+            <div class="connection-item">
+                <div class="connection-companies">
+                    <span class="{% if conn.a_is_client %}client-name{% endif %}">{{ conn.company_a_name }}</span>
+                    <span class="connection-arrow">&harr;</span>
+                    <span class="{% if conn.b_is_client %}client-name{% endif %}">{{ conn.company_b_name }}</span>
+                </div>
+                <span class="connection-type badge">{{ conn.connection_type | replace('_', ' ') | title }}</span>
+                <p class="connection-desc">{{ conn.description[:200] }}{% if conn.description|length > 200 %}...{% endif %}</p>
+                <div class="strength-bar">
+                    <div class="strength-fill" style="width: {{ (conn.strength * 100)|int }}%"></div>
+                    <span class="strength-label">{{ (conn.strength * 100)|int }}% confidence</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% if connections|length > 5 %}
+        <a href="/connections/{{ batch_id }}" class="btn btn-secondary">View All {{ connections|length }} Connections</a>
+        {% endif %}
+    </div>
+    {% endif %}
+</div>
+
+<script>
+{% if autoprocess %}
+document.addEventListener('DOMContentLoaded', startProcessing);
+{% endif %}
+
+function startProcessing() {
+    const overlay = document.getElementById('processing-overlay');
+    overlay.style.display = 'flex';
+
+    const eventSource = new EventSource('/api/process/{{ batch_id }}');
+    const progressFill = document.getElementById('progress-fill');
+    const progressMessage = document.getElementById('progress-message');
+    const progressDetail = document.getElementById('progress-detail');
+
+    eventSource.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+
+        if (data.type === 'progress') {
+            const pct = (data.current / data.total) * 100;
+            let totalPct;
+
+            if (data.phase === 'search') {
+                totalPct = pct * 0.5;
+                progressDetail.textContent = `Phase 1/3: Searching (${data.current}/${data.total})`;
+            } else if (data.phase === 'report') {
+                totalPct = 50 + pct * 0.3;
+                progressDetail.textContent = `Phase 2/3: Generating Reports (${data.current}/${data.total})`;
+            } else if (data.phase === 'connections') {
+                totalPct = 80 + pct * 0.2;
+                progressDetail.textContent = 'Phase 3/3: Mapping Connections';
+            }
+
+            progressFill.style.width = totalPct + '%';
+            progressMessage.textContent = data.message;
+        } else if (data.type === 'complete') {
+            progressFill.style.width = '100%';
+            progressMessage.textContent = data.message;
+            eventSource.close();
+            setTimeout(() => location.reload(), 1500);
+        } else if (data.type === 'error') {
+            progressMessage.textContent = 'Error: ' + data.message;
+            progressMessage.style.color = '#e74c3c';
+            eventSource.close();
+        }
+    };
+
+    eventSource.onerror = function() {
+        eventSource.close();
+        progressMessage.textContent = 'Connection lost. Please refresh the page.';
+    };
+}
+</script>
+{% endblock %}
